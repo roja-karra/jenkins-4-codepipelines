@@ -15,17 +15,11 @@ pipeline {
 
         stage('Init') {
             steps {
-                 sh '/usr/local/bin/terraform init'
+                sh 'terraform init -backend-config="bucket=p2-revhire-s3-bucket" -backend-config="key=terraform.tfstate" -backend-config="region=us-west-2" -backend-config="dynamodb_table=p2-dynamo-db" -backend-config="encrypt=true"'
             }
         }
 
-        stage('Refresh') {
-            steps {
-                sh 'terraform refresh'
-            }
-        }
-
-        stage('Plan') {
+        stage('Plan') { // Refresh is implicitly handled in plan
             steps {
                 sh 'terraform plan -out=plan.out'
             }
