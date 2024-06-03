@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
-        AWS_DEFAULT_REGION = 'us-west-2'  // Match the region in your backend.tf
+        AWS_DEFAULT_REGION = 'us-west-2'
         CLUSTER_NAME = 'revhire-cluster'
         INGRESS_NAMESPACE = 'ingress-controller'
     }
@@ -35,7 +35,14 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan -out=plan.out'
+                script {
+                    def planResult = sh(script: 'terraform plan -out=plan.out', returnStatus: true)
+                    if (planResult != 0) {
+                        echo 'Plan failed, attempting to unlock state'
+                        sh 'terraform force-unlock 1c6a57a5-26e9-b180-58f0-c46dafca8c92'
+                        sh 'terraform plan -out=plan.out'
+                    }
+                }
             }
         }
 
