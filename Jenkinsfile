@@ -7,16 +7,14 @@ pipeline {
         AWS_DEFAULT_REGION = 'us-west-2'
         CLUSTER_NAME = 'my-cluster'
         INGRESS_NAMESPACE = 'ingress-controller'
+        CREATE_KMS_ALIAS = true // Set to true if you want to create KMS alias
+        CREATE_CLOUDWATCH_LOG_GROUP = true // Set to true if you want to create CloudWatch log group
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scmGit(
-                    branches: [[name: '*/main']],
-                    extensions: [],
-                    userRemoteConfigs: [[url: 'https://github.com/roja-karra/jenkins-4-codepipelines.git']]
-                )
+                checkout scm
             }
         }
 
@@ -34,16 +32,15 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                sh 'terraform apply -auto-approve'
-            }
-        }
-
-        stage('Configure AWS CLI') {
-            steps {
                 script {
-                    sh 'aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID'
-                    sh 'aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY'
-                    sh 'aws configure set default.region $AWS_DEFAULT_REGION'
+                    // Add conditional logic for KMS alias creation
+                    def createKmsAlias = env.CREATE_KMS_ALIAS ? '-var create_kms_alias=true' : '-var create_kms_alias=false'
+                    
+                    // Add conditional logic for CloudWatch log group creation
+                    def createCloudWatchLogGroup = env.CREATE_CLOUDWATCH_LOG_GROUP ? '-var create_cloudwatch_log_group=true' : '-var create_cloudwatch_log_group=false'
+
+                    // Run Terraform apply with conditional flags
+                    sh "terraform apply -auto-approve $createKmsAlias $createCloudWatchLogGroup"
                 }
             }
         }
@@ -69,9 +66,7 @@ pipeline {
             steps {
                 script {
                     def namespaceExists = sh(script: "kubectl get namespace $INGRESS_NAMESPACE", returnStatus: true)
-                    if (namespaceExists == 0) {
-                        echo "Namespace $INGRESS_NAMESPACE already exists. Skipping creation."
-                    } else {
+                    if (namespaceExists != 0) {
                         sh "kubectl create namespace $INGRESS_NAMESPACE"
                     }
                 }
@@ -99,15 +94,10 @@ pipeline {
             steps {
                 script {
                     def prometheusNamespaceExists = sh(script: "kubectl get namespace prometheus", returnStatus: true)
-                    if (prometheusNamespaceExists == 0) {
-                        echo "Namespace prometheus already exists. Skipping creation."
-                    } else {
-                        echo "Creating namespace prometheus..."
+                    if (prometheusNamespaceExists != 0) {
                         sh "kubectl create namespace prometheus"
-                        echo "Installing Prometheus..."
-                        sh 'helm install stable prometheus-community/kube-prometheus-stack -n prometheus'
+                        sh 'helm install prometheus prometheus-community/kube-prometheus-stack -n prometheus'
                     }
-
                 }
             }
         }
