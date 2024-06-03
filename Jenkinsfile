@@ -5,7 +5,7 @@ pipeline {
         AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
         AWS_DEFAULT_REGION = 'us-west-2'
-        CLUSTER_NAME = 'revhire-cluster'
+        CLUSTER_NAME = 'my-cluster'
         INGRESS_NAMESPACE = 'ingress-controller'
     }
 
@@ -15,7 +15,7 @@ pipeline {
                 checkout scmGit(
                     branches: [[name: '*/main']],
                     extensions: [],
-                    userRemoteConfigs: [[url: 'https://github.com/prasannababu7/revhire-backend-infra-repo.git']]
+                    userRemoteConfigs: [[url: 'https://github.com/roja-karra/jenkins-4-codepipelines.git']]
                 )
             }
         }
