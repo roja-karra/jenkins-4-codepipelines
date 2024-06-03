@@ -22,33 +22,19 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                sh '''
-                terraform init \
-                    -backend-config="bucket=p2-revhire-s3-bucket" \
-                    -backend-config="key=terraform.tfstate" \
-                    -backend-config="region=us-west-2" \
-                    -backend-config="dynamodb_table=p2-dynamo-db" \
-                    -backend-config="encrypt=true"
-                '''
+                sh 'terraform init -reconfigure'
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                script {
-                    def planResult = sh(script: 'terraform plan -out=plan.out', returnStatus: true)
-                    if (planResult != 0) {
-                        echo 'Plan failed, attempting to unlock state'
-                        sh 'terraform force-unlock 1c6a57a5-26e9-b180-58f0-c46dafca8c92'
-                        sh 'terraform plan -out=plan.out'
-                    }
-                }
+                sh 'terraform plan'
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                sh 'terraform apply -auto-approve plan.out'
+                sh 'terraform apply -auto-approve'
             }
         }
 
@@ -82,8 +68,8 @@ pipeline {
         stage('Create Ingress Namespace') {
             steps {
                 script {
-                    def namespaceExists = sh(script: "kubectl get namespace $INGRESS_NAMESPACE", returnStatus: true) == 0
-                    if (namespaceExists) {
+                    def namespaceExists = sh(script: "kubectl get namespace $INGRESS_NAMESPACE", returnStatus: true)
+                    if (namespaceExists == 0) {
                         echo "Namespace $INGRESS_NAMESPACE already exists. Skipping creation."
                     } else {
                         sh "kubectl create namespace $INGRESS_NAMESPACE"
@@ -112,15 +98,16 @@ pipeline {
         stage('Create and Install Prometheus') {
             steps {
                 script {
-                    def prometheusNamespaceExists = sh(script: "kubectl get namespace prometheus", returnStatus: true) == 0
-                    if (prometheusNamespaceExists) {
+                    def prometheusNamespaceExists = sh(script: "kubectl get namespace prometheus", returnStatus: true)
+                    if (prometheusNamespaceExists == 0) {
                         echo "Namespace prometheus already exists. Skipping creation."
                     } else {
                         echo "Creating namespace prometheus..."
                         sh "kubectl create namespace prometheus"
+                        echo "Installing Prometheus..."
+                        sh 'helm install stable prometheus-community/kube-prometheus-stack -n prometheus'
                     }
-                    echo "Installing Prometheus..."
-                    sh 'helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -n prometheus'
+
                 }
             }
         }
@@ -140,17 +127,11 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Destroy') {
             steps {
                 sh 'terraform destroy -auto-approve'
             }
-        }
-    }
-    
-    post {
-        always {
-            cleanWs()
         }
     }
 }
